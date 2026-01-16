@@ -5,6 +5,7 @@
 	import { config, models, tags as _tags } from '$lib/stores';
 	import Tags from '$lib/components/common/Tags.svelte';
 	import XMark from '$lib/components/icons/XMark.svelte';
+	import { languages } from '@codemirror/language-data';
 
 	const i18n = getContext('i18n');
 
@@ -14,29 +15,54 @@
 	export let show = false;
 
 	let LIKE_REASONS = [
-		'accurate_information',
-		'followed_instructions_perfectly',
-		'showcased_creativity',
-		'positive_attitude',
-		'attention_to_detail',
-		'thorough_explanation',
-		'other'
 	];
 	let DISLIKE_REASONS = [
-		'dont_like_the_style',
-		'too_verbose',
-		'not_helpful',
-		'not_factually_correct',
-		'didnt_fully_follow_instructions',
-		'refused_when_it_shouldnt_have',
-		'being_lazy',
-		'other'
+		'HALLUCINATION',
+		'OUTDATED-INFO',
+		'OVERGENERALIZATION',
+		'LOGIC',
+		'MATH',
+		'PARTIAL-REASONING',
+		'CONTRADICTION',
+		'SEQUENCE-REPETITION',
+		'TURN-REPETITION',
+		'WORD-SALAD',
+		'VA-LLENO',
+		'BRIEFTY',
+		'UNCLEAR-REFERENCE',
+		'TONE-SHIFT',
+		'LANGUAGE-SHIFT',
+		'LANGUAGE-ERROR',
+		'IGNORED-CONSTRAINT',
+		'OVER-REFUSAL',
+		'UNDER-REFUSAL',
+		'PARTIAL-ANSWER',
+		'CODE',
+		'TRANSLATION',
+		'SUMMARIZATION',
+		'FORMAT',
+		'OVERCONFIDENCE',
+		'CONTEXT-INCONSISTENCY',
+		'CONTEXT-IGNORED',
+		'NO-DISCLAIMING',
+		'DIALECT',
+		'CULTURE',
+		'IDENTITY',
+		'OVERREACHER',
+		'OTHER',
+		'PROMPT-FLAWED'
 	];
+
+	let PROMPT_LANGUAGES = [
+		'ES', 'CA', 'EN', 'EU', 'GL'
+	]
 
 	let tags = [];
 
 	let reasons = [];
-	let selectedReason = null;
+	let selectedReasons = null;
+	let selectedLangs  = null;
+	let langs = [];
 	let comment = '';
 
 	let detailedRating = null;
@@ -44,8 +70,10 @@
 
 	$: if (message?.annotation?.rating === 1) {
 		reasons = LIKE_REASONS;
+		langs = PROMPT_LANGUAGES;
 	} else if (message?.annotation?.rating === -1) {
 		reasons = DISLIKE_REASONS;
+		langs = PROMPT_LANGUAGES;
 	}
 
 	$: if (message) {
@@ -53,8 +81,12 @@
 	}
 
 	const init = () => {
-		if (!selectedReason) {
-			selectedReason = message?.annotation?.reason ?? '';
+		if (!selectedReasons) {
+			selectedReasons = message?.annotation?.reason?.split(",") ?? [];
+		}
+
+		if (!selectedLangs) {
+			selectedLangs = message?.annotation?.lang?.split(",") ?? [];
 		}
 
 		if (!comment) {
@@ -89,7 +121,8 @@
 		// }
 
 		dispatch('save', {
-			reason: selectedReason,
+			reason: selectedReasons.toString(),
+			lang: selectedLangs.toString(),
 			comment: comment,
 			tags: tags.map((tag) => tag.name),
 			details: {
@@ -161,51 +194,50 @@
 	</div>
 
 	<div>
+		<div class="flex flex-wrap gap-1.5 text-sm mt-1.5">
+				{#each langs as lang}
+					<button
+						class="px-3 py-0.5 border border-gray-100/30 dark:border-gray-850/30 hover:bg-gray-50 dark:hover:bg-gray-850 {selectedLangs.includes(
+							lang)
+								? 'bg-gray-100 dark:bg-gray-800'
+								: ''} transition rounded-xl"
+							on:click={() => {
+								if (selectedLangs.includes(lang)) {
+									selectedLangs.splice(selectedLangs.indexOf(lang), 1)
+								}
+								else {
+									console.log("selected "+lang)
+								selectedLangs.push(lang)
+								console.log("status "+selectedLangs)
+								}
+							}}
+						>						
+						{lang}
+					</button>
+				{/each}
+		</div>
 		{#if reasons.length > 0}
 			<div class="text-sm mt-1.5 font-medium">{$i18n.t('Why?')}</div>
 
 			<div class="flex flex-wrap gap-1.5 text-sm mt-1.5">
 				{#each reasons as reason}
 					<button
-						class="px-3 py-0.5 border border-gray-100/30 dark:border-gray-850/30 hover:bg-gray-50 dark:hover:bg-gray-850 {selectedReason ===
-						reason
+						class="px-3 py-0.5 border border-gray-100/30 dark:border-gray-850/30 hover:bg-gray-50 dark:hover:bg-gray-850 {selectedReasons.includes(
+						reason)
 							? 'bg-gray-100 dark:bg-gray-800'
 							: ''} transition rounded-xl"
 						on:click={() => {
-							selectedReason = reason;
+							if (selectedReasons.includes(reason)) {
+								selectedReasons.splice(selectedReasons.indexOf(reason), 1)
+							}
+					        else {
+								console.log("selected "+reason)
+							   selectedReasons.push(reason)
+							   console.log("status "+selectedReasons)
+							}
 						}}
 					>
-						{#if reason === 'accurate_information'}
-							{$i18n.t('Accurate information')}
-						{:else if reason === 'followed_instructions_perfectly'}
-							{$i18n.t('Followed instructions perfectly')}
-						{:else if reason === 'showcased_creativity'}
-							{$i18n.t('Showcased creativity')}
-						{:else if reason === 'positive_attitude'}
-							{$i18n.t('Positive attitude')}
-						{:else if reason === 'attention_to_detail'}
-							{$i18n.t('Attention to detail')}
-						{:else if reason === 'thorough_explanation'}
-							{$i18n.t('Thorough explanation')}
-						{:else if reason === 'dont_like_the_style'}
-							{$i18n.t("Don't like the style")}
-						{:else if reason === 'too_verbose'}
-							{$i18n.t('Too verbose')}
-						{:else if reason === 'not_helpful'}
-							{$i18n.t('Not helpful')}
-						{:else if reason === 'not_factually_correct'}
-							{$i18n.t('Not factually correct')}
-						{:else if reason === 'didnt_fully_follow_instructions'}
-							{$i18n.t("Didn't fully follow instructions")}
-						{:else if reason === 'refused_when_it_shouldnt_have'}
-							{$i18n.t("Refused when it shouldn't have")}
-						{:else if reason === 'being_lazy'}
-							{$i18n.t('Being lazy')}
-						{:else if reason === 'other'}
-							{$i18n.t('Other')}
-						{:else}
-							{reason}
-						{/if}
+						{reason}
 					</button>
 				{/each}
 			</div>
