@@ -208,32 +208,75 @@ async def generate_chat_completion(
                 raise e
 
         if model.get("owned_by") == "arena":
-            model_ids = model.get("info", {}).get("meta", {}).get("model_ids")
-            filter_mode = model.get("info", {}).get("meta", {}).get("filter_mode")
-            if model_ids and filter_mode == "exclude":
-                model_ids = [
-                    model["id"]
-                    for model in list(request.app.state.MODELS.values())
-                    if model.get("owned_by") != "arena" and model["id"] not in model_ids
-                ]
-
+            # Initialize session model storage if it doesn't exist
+            if not hasattr(request.app.state, "ARENA_SESSION_MODELS"):
+                request.app.state.ARENA_SESSION_MODELS = {}
+            
+            # Get session_id from metadata to maintain model consistency within session
+            metadata = form_data.get("metadata", {})
+            session_id = metadata.get("session_id")
+            
+            # Create a unique key for this arena model and session combination
+            arena_model_id = model.get("id")
+            arena_model_name = model.get("name") or arena_model_id
+            session_key = f"{arena_model_id}:{session_id}" if session_id else None
+            
+            # Check if we already have a selected model for this session
             selected_model_id = None
-            if isinstance(model_ids, list) and model_ids:
-                selected_model_id = random.choice(model_ids)
-            else:
-                model_ids = [
-                    model["id"]
-                    for model in list(request.app.state.MODELS.values())
-                    if model.get("owned_by") != "arena"
-                ]
-                selected_model_id = random.choice(model_ids)
+            if session_key and session_key in request.app.state.ARENA_SESSION_MODELS:
+                selected_model_id = request.app.state.ARENA_SESSION_MODELS[session_key]
+                # Verify the stored model still exists and is valid
+                if selected_model_id not in request.app.state.MODELS:
+                    selected_model_id = None
+                    del request.app.state.ARENA_SESSION_MODELS[session_key]
+            
+            # If no model is stored for this session, select one randomly
+            if selected_model_id is None:
+                model_ids = model.get("info", {}).get("meta", {}).get("model_ids")
+                filter_mode = model.get("info", {}).get("meta", {}).get("filter_mode")
+                if model_ids and filter_mode == "exclude":
+                    model_ids = [
+                        model["id"]
+                        for model in list(request.app.state.MODELS.values())
+                        if model.get("owned_by") != "arena" and model["id"] not in model_ids
+                    ]
+
+                if isinstance(model_ids, list) and model_ids:
+                    selected_model_id = random.choice(model_ids)
+                else:
+                    model_ids = [
+                        model["id"]
+                        for model in list(request.app.state.MODELS.values())
+                        if model.get("owned_by") != "arena"
+                    ]
+                    selected_model_id = random.choice(model_ids)
+                
+                # Store the selected model for this session
+                if session_key:
+                    request.app.state.ARENA_SESSION_MODELS[session_key] = selected_model_id
+
+            selected_model_name = (
+                request.app.state.MODELS.get(selected_model_id, {}).get("name")
+                or selected_model_id
+            )
 
             form_data["model"] = selected_model_id
 
             if form_data.get("stream") == True:
 
                 async def stream_wrapper(stream):
-                    yield f"data: {json.dumps({'selected_model_id': selected_model_id})}\n\n"
+                    yield (
+                        "data: "
+                        + json.dumps(
+                            {
+                                "selected_model_id": selected_model_id,
+                                "selected_model_name": selected_model_name,
+                                "arena_model_id": arena_model_id,
+                                "arena_model_name": arena_model_name,
+                            }
+                        )
+                        + "\n\n"
+                    )
                     async for chunk in stream:
                         yield chunk
 
@@ -261,6 +304,9 @@ async def generate_chat_completion(
                         )
                     ),
                     "selected_model_id": selected_model_id,
+                    "selected_model_name": selected_model_name,
+                    "arena_model_id": arena_model_id,
+                    "arena_model_name": arena_model_name,
                 }
 
         if model.get("pipe"):
