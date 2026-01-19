@@ -954,6 +954,47 @@ async def update_chat_by_id(
     chat = Chats.get_chat_by_id_and_user_id(id, user.id, db=db)
     if chat:
         updated_chat = {**chat.chat, **form_data.chat}
+
+        existing_history = chat.chat.get("history", {}) or {}
+        incoming_history = form_data.chat.get("history", {}) or {}
+        existing_messages = existing_history.get("messages", {}) or {}
+        incoming_messages = incoming_history.get("messages", {}) or {}
+
+        if isinstance(existing_messages, dict) and isinstance(incoming_messages, dict):
+            merged_messages = {**existing_messages}
+            for message_id, incoming_message in incoming_messages.items():
+                existing_message = existing_messages.get(message_id, {})
+                merged_messages[message_id] = {
+                    **(existing_message if isinstance(existing_message, dict) else {}),
+                    **(incoming_message if isinstance(incoming_message, dict) else {}),
+                }
+            merged_history = {
+                **existing_history,
+                **incoming_history,
+                "messages": merged_messages,
+            }
+            updated_chat["history"] = merged_history
+
+        existing_message_list = chat.chat.get("messages")
+        incoming_message_list = form_data.chat.get("messages")
+        if isinstance(existing_message_list, list) and isinstance(
+            incoming_message_list, list
+        ):
+            existing_message_map = {
+                message.get("id"): message
+                for message in existing_message_list
+                if isinstance(message, dict) and message.get("id")
+            }
+            merged_list = []
+            for incoming_message in incoming_message_list:
+                if not isinstance(incoming_message, dict):
+                    merged_list.append(incoming_message)
+                    continue
+                message_id = incoming_message.get("id")
+                existing_message = existing_message_map.get(message_id, {})
+                merged_list.append({**existing_message, **incoming_message})
+            updated_chat["messages"] = merged_list
+
         chat = Chats.update_chat_by_id(id, updated_chat, db=db)
         return ChatResponse(**chat.model_dump())
     else:
