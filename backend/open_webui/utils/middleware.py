@@ -2188,11 +2188,43 @@ async def process_chat_response(
                             )
 
                     if "selected_model_id" in response_data:
+                        selected_model_id = response_data["selected_model_id"]
+                        selected_model_name = response_data.get("selected_model_name")
+                        arena_model_id = response_data.get("arena_model_id")
+                        arena_model_name = response_data.get("arena_model_name")
+
+                        if not selected_model_name and selected_model_id:
+                            selected_model_name = (
+                                request.app.state.MODELS.get(selected_model_id, {}).get(
+                                    "name"
+                                )
+                                or selected_model_id
+                            )
+
+                        if model.get("owned_by") == "arena":
+                            if not arena_model_id:
+                                arena_model_id = model.get("id")
+                            if not arena_model_name:
+                                arena_model_name = model.get("name") or arena_model_id
+
                         Chats.upsert_message_to_chat_by_id_and_message_id(
                             metadata["chat_id"],
                             metadata["message_id"],
                             {
-                                "selectedModelId": response_data["selected_model_id"],
+                                "selectedModelId": selected_model_id,
+                                **(
+                                    {
+                                        "selectedModelName": selected_model_name,
+                                        "arenaModelId": arena_model_id,
+                                        "arenaModelName": arena_model_name,
+                                    }
+                                    if (
+                                        selected_model_name
+                                        or arena_model_id
+                                        or arena_model_name
+                                    )
+                                    else {}
+                                ),
                             },
                         )
 
@@ -2829,11 +2861,46 @@ async def process_chat_response(
 
                                 if "selected_model_id" in data:
                                     model_id = data["selected_model_id"]
+                                    selected_model_name = data.get("selected_model_name")
+                                    arena_model_id = data.get("arena_model_id")
+                                    arena_model_name = data.get("arena_model_name")
+
+                                    if not selected_model_name and model_id:
+                                        selected_model_name = (
+                                            request.app.state.MODELS.get(
+                                                model_id, {}
+                                            ).get("name")
+                                            or model_id
+                                        )
+
+                                    if model.get("owned_by") == "arena":
+                                        if not arena_model_id:
+                                            arena_model_id = model.get("id")
+                                        if not arena_model_name:
+                                            arena_model_name = (
+                                                model.get("name") or arena_model_id
+                                            )
+
                                     Chats.upsert_message_to_chat_by_id_and_message_id(
                                         metadata["chat_id"],
                                         metadata["message_id"],
                                         {
                                             "selectedModelId": model_id,
+                                            **(
+                                                {
+                                                    "selectedModelName": (
+                                                        selected_model_name
+                                                    ),
+                                                    "arenaModelId": arena_model_id,
+                                                    "arenaModelName": arena_model_name,
+                                                }
+                                                if (
+                                                    selected_model_name
+                                                    or arena_model_id
+                                                    or arena_model_name
+                                                )
+                                                else {}
+                                            ),
                                         },
                                     )
                                     await event_emitter(
