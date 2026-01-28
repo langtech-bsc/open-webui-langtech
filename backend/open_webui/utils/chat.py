@@ -38,6 +38,7 @@ from open_webui.routers.pipelines import (
 
 from open_webui.models.functions import Functions
 from open_webui.models.models import Models
+from open_webui.models.chats import Chats
 
 
 from open_webui.utils.plugin import (
@@ -212,16 +213,20 @@ async def generate_chat_completion(
             if not hasattr(request.app.state, "ARENA_SESSION_MODELS"):
                 request.app.state.ARENA_SESSION_MODELS = {}
             
-            # Get session_id from metadata to maintain model consistency within session
+            # Get chat_id/session_id from metadata to maintain model consistency
             metadata = form_data.get("metadata", {})
+            chat_id = metadata.get("chat_id")
             session_id = metadata.get("session_id")
             
-            # Create a unique key for this arena model and session combination
+            # Create a unique key for this arena model and chat/session combination
             arena_model_id = model.get("id")
             arena_model_name = model.get("name") or arena_model_id
-            session_key = f"{arena_model_id}:{session_id}" if session_id else None
+            cache_key_id = chat_id or session_id
+            session_key = (
+                f"{arena_model_id}:{cache_key_id}" if cache_key_id else None
+            )
             
-            # Check if we already have a selected model for this session
+            # Check if we already have a selected model for this chat/session
             selected_model_id = None
             if session_key and session_key in request.app.state.ARENA_SESSION_MODELS:
                 selected_model_id = request.app.state.ARENA_SESSION_MODELS[session_key]
@@ -229,8 +234,22 @@ async def generate_chat_completion(
                 if selected_model_id not in request.app.state.MODELS:
                     selected_model_id = None
                     del request.app.state.ARENA_SESSION_MODELS[session_key]
+
+            # If not cached but chat_id is present, check persisted chat metadata
+            if selected_model_id is None and chat_id:
+                chat = Chats.get_chat_by_id(chat_id)
+                if chat:
+                    arena_model_selections = (
+                        chat.chat.get("arena_model_selections", {}) or {}
+                    )
+                    persisted_model_id = arena_model_selections.get(arena_model_id)
+                    if (
+                        persisted_model_id
+                        and persisted_model_id in request.app.state.MODELS
+                    ):
+                        selected_model_id = persisted_model_id
             
-            # If no model is stored for this session, select one randomly
+            # If no model is stored for this chat/session, select one randomly
             if selected_model_id is None:
                 model_ids = model.get("info", {}).get("meta", {}).get("model_ids")
                 filter_mode = model.get("info", {}).get("meta", {}).get("filter_mode")
@@ -254,6 +273,17 @@ async def generate_chat_completion(
                 # Store the selected model for this session
                 if session_key:
                     request.app.state.ARENA_SESSION_MODELS[session_key] = selected_model_id
+
+                # Persist the selected model for this chat in the DB (if available)
+                if chat_id:
+                    chat = Chats.get_chat_by_id(chat_id)
+                    if chat:
+                        arena_model_selections = (
+                            chat.chat.get("arena_model_selections", {}) or {}
+                        )
+                        arena_model_selections[arena_model_id] = selected_model_id
+                        chat.chat["arena_model_selections"] = arena_model_selections
+                        Chats.update_chat_by_id(chat_id, chat.chat)
 
             selected_model_name = (
                 request.app.state.MODELS.get(selected_model_id, {}).get("name")
