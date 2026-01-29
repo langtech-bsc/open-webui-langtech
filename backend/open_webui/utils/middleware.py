@@ -2861,7 +2861,9 @@ async def process_chat_response(
 
                                 if "selected_model_id" in data:
                                     model_id = data["selected_model_id"]
-                                    selected_model_name = data.get("selected_model_name")
+                                    selected_model_name = data.get(
+                                        "selected_model_name"
+                                    )
                                     arena_model_id = data.get("arena_model_id")
                                     arena_model_name = data.get("arena_model_name")
 

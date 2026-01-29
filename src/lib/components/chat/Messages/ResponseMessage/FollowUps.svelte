@@ -7,6 +7,7 @@
 	export let followUps: string[] = [];
 	export let onClick: (followUp: string) => void = () => {};
 </script>
+
 <!-- @jab disable follow ups
 <div class="mt-4">
 	<div class="text-sm font-medium">
