@@ -63,14 +63,16 @@
 	export let selectedLangs = null;
 	let langs = [];
 	let comment = '';
-
-	let detailedRating = null;
+	let warn = 0;
+	let rating = null;
 	let selectedModel = null;
 
 	$: if (message?.annotation?.rating === 1) {
 		reasons = LIKE_REASONS;
+		rating = 1
 	} else if (message?.annotation?.rating === -1) {
 		reasons = DISLIKE_REASONS;
+		rating = -1
 	}
 	langs = PROMPT_LANGUAGES;
 	promptReasons = PROMPT_REASONS;
@@ -85,11 +87,11 @@
 		}
 
 		if (!selectedReasons) {
-			selectedReasons = message?.annotation?.reason?.split(',') ?? [];
+			selectedReasons = message?.annotation?.reasons?.split(',') ?? [];
 		}
 
 		if (!selectedLangs) {
-			selectedLangs = message?.annotation?.lang?.split(',') ?? [];
+			selectedLangs = message?.annotation?.langs?.split(',') ?? [];
 		}
 
 		if (!comment) {
@@ -100,9 +102,6 @@
 			name: tag
 		}));
 
-		if (!detailedRating) {
-			detailedRating = message?.annotation?.details?.rating ?? null;
-		}
 	};
 
 	onMount(() => {
@@ -118,25 +117,31 @@
 	});
 
 	const saveHandler = () => {
-		console.log('saveHandler');
-		console.log(selectedLangs.length);
-		if (selectedLangs.length < 2 || (detailedRating < 0 && selectedReasons.length < 3)) {
-			toast.error($i18n.t('Please select a reason'));
-			return;
+//		console.log('saveHandler');
+//		console.log(selectedLangs.length);
+//		console.log(rating);
+//		console.log(selectedReasons.length);
+		if (selectedLangs.length < 1 || ( (rating === -1) && (selectedReasons.length < 1))) {
+			toast.error($i18n.t(selectedLangs.length < 1  ? 'Please select a Language' : 'Please select a reason'));
+			// save anyway
+			// return;
+			warn = 1
+		} else {
+			warn = 0
 		}
 
 		dispatch('save', {
-			reason: selectedReasons.toString(),
-			promtpReasons: selectedPromptReasons.toString(),
-			lang: selectedLangs.toString(),
+			reasons: selectedReasons.toString(),
+			promptReasons: selectedPromptReasons.toString(),
+			langs: selectedLangs.toString(),
 			comment: comment,
 			tags: tags.map((tag) => tag.name),
-			details: {
-				rating: detailedRating
-			}
+			warn: warn
 		});
 
-		toast.success($i18n.t('Thanks for your feedback!'));
+		if (warn === 0) {
+			toast.success($i18n.t('Thanks for your feedback!'));
+		}
 		show = false;
 	};
 </script>
