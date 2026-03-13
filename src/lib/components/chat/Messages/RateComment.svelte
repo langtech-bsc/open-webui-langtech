@@ -58,8 +58,9 @@
 		'CULTURE',
 		'IDENTITY',
 		'OVERREACHER',
-		'OTHER'
-	];
+		'OTHER',
+		'FORCED STOP'
+	].sort();
 
 	let PROMPT_LANGUAGES = ['ES', 'CA', 'EN', 'EU', 'GL'];
 
