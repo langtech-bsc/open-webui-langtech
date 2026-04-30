@@ -212,20 +212,18 @@ async def generate_chat_completion(
             # Initialize session model storage if it doesn't exist
             if not hasattr(request.app.state, "ARENA_SESSION_MODELS"):
                 request.app.state.ARENA_SESSION_MODELS = {}
-            
+
             # Get chat_id/session_id from metadata to maintain model consistency
             metadata = form_data.get("metadata", {})
             chat_id = metadata.get("chat_id")
             session_id = metadata.get("session_id")
-            
+
             # Create a unique key for this arena model and chat/session combination
             arena_model_id = model.get("id")
             arena_model_name = model.get("name") or arena_model_id
             cache_key_id = chat_id or session_id
-            session_key = (
-                f"{arena_model_id}:{cache_key_id}" if cache_key_id else None
-            )
-            
+            session_key = f"{arena_model_id}:{cache_key_id}" if cache_key_id else None
+
             # Check if we already have a selected model for this chat/session
             selected_model_id = None
             if session_key and session_key in request.app.state.ARENA_SESSION_MODELS:
@@ -248,7 +246,7 @@ async def generate_chat_completion(
                         and persisted_model_id in request.app.state.MODELS
                     ):
                         selected_model_id = persisted_model_id
-            
+
             # If no model is stored for this chat/session, select one randomly
             if selected_model_id is None:
                 model_ids = model.get("info", {}).get("meta", {}).get("model_ids")
@@ -257,7 +255,8 @@ async def generate_chat_completion(
                     model_ids = [
                         model["id"]
                         for model in list(request.app.state.MODELS.values())
-                        if model.get("owned_by") != "arena" and model["id"] not in model_ids
+                        if model.get("owned_by") != "arena"
+                        and model["id"] not in model_ids
                     ]
 
                 if isinstance(model_ids, list) and model_ids:
@@ -269,10 +268,12 @@ async def generate_chat_completion(
                         if model.get("owned_by") != "arena"
                     ]
                     selected_model_id = random.choice(model_ids)
-                
+
                 # Store the selected model for this session
                 if session_key:
-                    request.app.state.ARENA_SESSION_MODELS[session_key] = selected_model_id
+                    request.app.state.ARENA_SESSION_MODELS[session_key] = (
+                        selected_model_id
+                    )
 
                 # Persist the selected model for this chat in the DB (if available)
                 if chat_id:
